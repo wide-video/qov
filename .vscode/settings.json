@@ -1,0 +1,11 @@
+{
+	"editor.insertSpaces": false,
+	"editor.detectIndentation": false,
+	"editor.renderWhitespace": "all",
+	"liveServer.settings.root": "/dist/",
+	"liveServer.settings.ignoreFiles": [
+		"**"
+	],
+	"typescript.tsdk": "node_modules\\typescript\\lib",
+	"git.ignoreLimitWarning": true
+}

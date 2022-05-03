@@ -1,0 +1,21 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Compile",
+			"type": "shell",
+			"command": "npx webpack",
+			"problemMatcher": ["$ts-webpack", "$tslint-webpack"],
+			"group": "build"
+		},
+		{
+			"label": "Start server",
+			"type": "shell",
+			"command": "http-server",
+			"group": "build",
+			"options": {
+				"cwd": "dist"
+			}
+		}
+	]
+}
