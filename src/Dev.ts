@@ -1,3 +1,6 @@
+export const assetImage = "/asset/bbb_1920x1080.png";
+export const assetVideo = "/asset/bbb_av1_640x360_25fps_aac_stereo_5s_0MB.mp4";
+
 /*
 const printRGBA = (source:ArrayBuffer) => {
 	const dv = new DataView(source);
@@ -13,12 +16,42 @@ export const fetchToCanvas = async (url:string, canvas:HTMLCanvasElement):Promis
 			canvas.width = image.naturalWidth;
 			canvas.height = image.naturalHeight;
 			const ctx = canvas.getContext("2d")!;
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
 			ctx.drawImage(image, 0, 0);
 			resolve();
 		}
 		image.src = url;
 	})
 }
+
+export const fetchFrames = async (url:string, canvas:HTMLCanvasElement, maxFrames:number,
+	onProgress?:(frame:number, progress:number)=>any):Promise<VideoFrames> => new Promise(resolve => {
+	const frames:Blob[] = [];
+	let width = 0;
+	let height = 0;
+	let frameRate = 0;
+	const video = document.createElement("video");
+	video.addEventListener("ended", () => resolve({width, height, frames, frameRate}));
+	video.src = url;
+	video.muted = true;
+	const drawingLoop = () => {
+		onProgress?.(frames.length + 1, video.currentTime / video.duration);
+		video.pause();
+		width = canvas.width = video.videoWidth;
+		height = canvas.height = video.videoHeight
+		frameRate = (frames.length + 1) / video.currentTime;
+		const ctx = canvas.getContext("2d")!;
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+		ctx.drawImage(video, 0, 0);
+		frames.push(new Blob([ctx.getImageData(0, 0, width, height).data]));
+		if(frames.length === maxFrames)
+			return resolve({width, height, frames, frameRate});
+		(<any>video).requestVideoFrameCallback(drawingLoop);
+		video.play();
+	}
+	(<any>video).requestVideoFrameCallback(drawingLoop);
+	video.play();
+})
 
 export const compare = (a:ArrayBuffer, b:ArrayBuffer):boolean => {
 	if(a.byteLength !== b.byteLength)
@@ -42,4 +75,11 @@ export const log = (message:string, element:HTMLElement) => {
 	const row = document.createElement("p");
 	row.innerHTML = message;
 	element.append(row);
+}
+
+type VideoFrames = {
+	readonly width:number;
+	readonly height:number;
+	readonly frameRate:number;
+	readonly frames:ReadonlyArray<Blob>;
 }

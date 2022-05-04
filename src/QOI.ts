@@ -1,22 +1,23 @@
-const QOI_MAGIC = 0x716f6966; // [...new TextEncoder().encode("qoif")].map(item => item.toString(16)).join("")
-const QOI_HEADER_SIZE = 14;
-const QOI_COLOR_HASH = (r:number, g:number, b:number, a:number):number => (r * 3 + g * 5 + b * 7 + a * 11) % 64;
-const QOI_OP_INDEX = 0x00 // 00xxxxxx
-const QOI_OP_DIFF = 0x40 // 01xxxxxx
-const QOI_OP_LUMA = 0x80 // 10xxxxxx
-const QOI_OP_RUN = 0xc0 // 11xxxxxx
-const QOI_OP_RGB = 0xfe // 11111110
-const QOI_OP_RGBA = 0xff // 11111111
-const QOI_MASK_2 = 0xc0 // 11000000
-const qoi_padding = [0, 0, 0, 0, 0, 0, 0, 1];
+export const QOI_MAGIC = 0x716f6966; // [...new TextEncoder().encode("qoif")].map(item => item.toString(16)).join("")
+export const QOI_HEADER_SIZE = 14;
+export const QOI_COLOR_HASH = (r:number, g:number, b:number, a:number):number => (r * 3 + g * 5 + b * 7 + a * 11) % 64;
+export const QOI_OP_INDEX = 0x00 // 00xxxxxx
+export const QOI_OP_DIFF = 0x40 // 01xxxxxx
+export const QOI_OP_LUMA = 0x80 // 10xxxxxx
+export const QOI_OP_RUN = 0xc0 // 11xxxxxx
+export const QOI_OP_RGB = 0xfe // 11111110
+export const QOI_OP_RGBA = 0xff // 11111111
+export const QOI_MASK_2 = 0xc0 // 11000000
+export const qoi_padding = [0, 0, 0, 0, 0, 0, 0, 1];
+export const QOI_PADDING_SIZE = qoi_padding.length
 
-const rgba2px = (r:number, g:number, b:number, a:number):number => 
+export const rgba2px = (r:number, g:number, b:number, a:number):number => 
 	(r << 24 | g << 16 | b << 8 | a) >>> 0;
 
 export function encode(source:Image):ArrayBuffer {
 	const {channels, colorspace, data, height, width} = source;
 	const index = new Uint32Array(64);
-	const max_size = width * height * (channels + 1) + QOI_HEADER_SIZE + qoi_padding.length;
+	const max_size = width * height * (channels + 1) + QOI_HEADER_SIZE + QOI_PADDING_SIZE;
 	const bytes = new Uint8Array(max_size);
 
 	const header = new DataView(bytes.buffer);
@@ -25,7 +26,7 @@ export function encode(source:Image):ArrayBuffer {
 	header.setUint32(8, height);
 	header.setUint8(12, channels);
 	header.setUint8(13, colorspace);
-	let p = 14;
+	let p = QOI_HEADER_SIZE;
 
 	const pixels = new Uint8Array(data);
 
@@ -111,18 +112,13 @@ export function encode(source:Image):ArrayBuffer {
 }
 
 export function decode(source:ArrayBuffer):Image {
-	let p = 0;
-	let run = 0;
-
 	const bytes = new Uint8Array(source);
 	const header = new DataView(bytes.buffer);
-	
 	//const header_magic = header.getUint32(0);
 	const width = header.getUint32(4);
 	const height = header.getUint32(8);
 	const channels = header.getUint8(12);
 	const colorspace = header.getUint8(13);
-	p = 14;
 
 	const px_len = width * height * channels;
 	const pixels = new Uint8Array(px_len);
@@ -132,14 +128,14 @@ export function decode(source:ArrayBuffer):Image {
 	let px_g = 0;
 	let px_b = 0;
 	let px_a = 255;
+	let run = 0;
+	let p = QOI_HEADER_SIZE;
 
-	const chunks_len = source.byteLength - qoi_padding.length;
 	for (let px_pos = 0; px_pos < px_len; px_pos += channels) {
 		if (run > 0) {
 			run--;
-		} else if (p < chunks_len) {
+		} else {
 			const b1 = bytes[p++]!;
-
 			if (b1 === QOI_OP_RGB) {
 				px_r = bytes[p++]!;
 				px_g = bytes[p++]!;

@@ -29,7 +29,7 @@ const run = async () => {
 	document.body.append(logElement);
 
 	log("fetching data");
-	await Dev.fetchToCanvas("/asset/bbb_1920x1080.png", canvas);
+	await Dev.fetchToCanvas(Dev.assetImage, canvas);
 	const rgba = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data.buffer;
 
 	Dev.log("<hr>", logElement);
