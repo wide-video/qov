@@ -1,18 +1,48 @@
 import * as Dev from "./Dev";
-import * as QOI from "./QOI";
-import { QOVDecoder, QOVEncoder } from "./QOV";
+import { QOVDecoder, QOVEncoder, QOV_isIframe } from "./QOV";
+import { QOVPlayer } from "./QOVPlayer";
+
+class Player extends QOVPlayer {
+	private decodingDuration = 0;
+
+	override get decoder():QOVDecoder | undefined {
+		return super.decoder;
+	}
+
+	override set decoder(value:QOVDecoder | undefined) {
+		super.decoder = value;
+		if(value)
+			log(`QOV decoded ${value.header.frames} frames from header`);
+	}
+
+	protected override async renderFrame() {
+		const result = await super.renderFrame();
+		const decoder = this.decoder;
+		if(result) {
+			const duration = result.decodingDuration;
+			this.decodingDuration += duration;
+			if(decoder)
+				log(`${result.iframe ? "I" : "P"}-Frame #${decoder.framesRead} decoded in ${duration|0}ms`);
+		} else if(decoder) {
+			const frames = decoder.header.frames;
+			const duration = this.decodingDuration;
+			log(`<b>QOV decoded ${frames} frames in ${duration|0}ms. Decoding speed is ${frames/duration*1000|0} fps</b>`);
+		}
+		return result;
+	}
+}
 
 const canvas = document.createElement("canvas");
-document.body.append(canvas);
-
-const canvas2 = document.createElement("canvas");
-document.body.append(canvas2);
-
+canvas.classList.add("source");
+const player = new Player();
 const logElement = document.createElement("pre");
-document.body.append(logElement);
+logElement.classList.add("log");
 
 const log = (message:string) => Dev.log(`${(performance.now()|0).toString().padStart(4, " ")}: ${message}`, logElement);
 
+document.body.append(canvas, player.element, logElement);
+
+/*
 const runImage = async () => {
 	await Dev.fetchToCanvas(Dev.assetImage, canvas);
 	const rgba = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data.buffer;
@@ -33,11 +63,14 @@ const runImage = async () => {
 	const ctx2 = canvas2.getContext("2d")!;
 	ctx2.putImageData(new ImageData(new Uint8ClampedArray(rgba_decoded.data), canvas2.width, canvas2.height), 0, 0);
 }
+*/
 
 const runVideo = async () => {
 	const progressElement = document.createElement("p");
+	const assetUrl = Dev.assetVideo;
+	const assetFilename = assetUrl.split("/").pop();
 	logElement.append(progressElement);
-	const {frames, width, height, frameRate} = await Dev.fetchFrames(Dev.assetVideo, canvas, 100, (frame, progress) => 
+	const {frames, width, height, frameRate} = await Dev.fetchFrames(assetUrl, canvas, NaN, (frame, progress) => 
 		progressElement.textContent = `reading frame #${frame} ${progress * 100|0}%`);
 	progressElement.remove();
 	
@@ -49,34 +82,26 @@ const runVideo = async () => {
 		const frame = frames[i]!;
 		const data = await frame.arrayBuffer();
 		const t0 = performance.now();
-		const qovFrame = encoder.writeFrame(data, false);
+		const qovFrame = encoder.writeFrame(data, !(i % 20));
 		const t1 = performance.now();
 		duration += t1-t0;
-		log(`Frame #${i+1} encoded to ${qovFrame.byteLength/1024|0}kB in ${t1-t0|0}ms`);
+		const iframe = QOV_isIframe(qovFrame);
+		log(`${iframe ? "I" : "P"}-Frame #${i+1} encoded to ${qovFrame.byteLength/1024|0}kB as in ${t1-t0|0}ms`);
 	}
 	const encoded = encoder.flush();
-	log(`QOV encoded to ${encoded.size/1024|0}kB in ${duration|0}ms`);
 
-	const decoder = new QOVDecoder(encoded);
-	const header = await decoder.readHeader();
-	canvas2.width = header.video.width;
-	canvas2.height = header.video.height;
-	const ctx = canvas2.getContext("2d")!;
-	log(`QOV decoded ${header.frames} frames from header`);
+	const qovFilename = `${assetFilename}.qov`;
+	const button = document.createElement("button");
+	button.textContent = `Save ${qovFilename}`;
+	button.onclick = () => Dev.saveFile(new File([encoded], qovFilename));
+	Dev.log(button, logElement);
 
-	for(let i = 0; i < header.frames; i++) {
-		const t0 = performance.now();
-		const decoded = await decoder.readFrame();
-		const t1 = performance.now();
-		log(`Frame #${i+1} decoded in ${t1-t0|0}ms`);
-		ctx.clearRect(0, 0, canvas2.width, canvas2.height);
-		ctx.putImageData(new ImageData(new Uint8ClampedArray(decoded), canvas2.width, canvas2.height), 0, 0);
-		await new Promise(resolve => setTimeout(resolve, 1000 / header.video.frameRate - performance.now() + t0));
-	}
+	log(`<b>QOV encoded to ${encoded.size/1024|0}kB in ${duration|0}ms</b>`);
+	player.src = encoded;
+	player.playWhenReady = true;
 }
 
 const run = async () => {
-	runImage;
 	runVideo();
 }
 

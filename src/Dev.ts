@@ -35,7 +35,9 @@ export const fetchFrames = async (url:string, canvas:HTMLCanvasElement, maxFrame
 	video.src = url;
 	video.muted = true;
 	const drawingLoop = () => {
-		onProgress?.(frames.length + 1, video.currentTime / video.duration);
+		onProgress?.(maxFrames
+			? (frames.length + 1) / maxFrames
+			: frames.length + 1, video.currentTime / video.duration);
 		video.pause();
 		width = canvas.width = video.videoWidth;
 		height = canvas.height = video.videoHeight
@@ -70,11 +72,27 @@ export const sha256Bytes = async (source:ArrayBuffer):Promise<string> => {
 	return resultBytes.map(x => x.toString(16).padStart(2, '0')).join("");
 }
 
-export const log = (message:string, element:HTMLElement) => {
+export const log = (message:string | HTMLElement, element:HTMLElement) => {
 	console.log(message);
-	const row = document.createElement("p");
-	row.innerHTML = message;
-	element.append(row);
+	const isBottom = element.scrollTop === (element.scrollHeight - element.clientHeight);
+	if(typeof message === "string") {
+		const row = document.createElement("p");
+		row.innerHTML = message;
+		element.append(row);
+	} else {
+		element.append(message);
+	}
+	if(isBottom)
+		element.scrollTop = element.scrollHeight;
+}
+
+export async function saveFile(file:File) {
+	try {
+		const handle = await (<any>window).showSaveFilePicker({suggestedName:file.name});
+		const writable = await handle.createWritable();
+		await writable.write(file);
+		await writable.close();
+	} catch(error) {}
 }
 
 type VideoFrames = {

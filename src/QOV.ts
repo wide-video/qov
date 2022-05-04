@@ -3,14 +3,17 @@ import * as QOI from "./QOI";
 export const QOV_MAGIC = 0x716f7631; // [...new TextEncoder().encode("qov1")].map(item => item.toString(16)).join("")
 export const QOV_HEADER_POSITION_FRAME_OFFSET = 25;
 export const QOV_FRAME_HEADER_SIZE = 1;
-export const QOV_P_FRAME = 1;
-export const QOV_I_FRAME = 0;
+export const QOV_I_FRAME = 0; // intra-coded
+export const QOV_P_FRAME = 1; // predictive
+
+export const QOV_isIframe = (frame:ArrayBuffer) => new Uint8Array(frame)[0] === QOV_I_FRAME;
 
 export class QOVEncoder {
 	readonly config:QOVVideoConfig;
 
 	private readonly frames:Blob[] = [];
 	private previous?:ArrayBuffer;
+	private readonly index = new Uint32Array(64);
 
 	constructor(config:QOVVideoConfig) {
 		this.config = config;
@@ -19,9 +22,9 @@ export class QOVEncoder {
 	writeFrame(data:ArrayBuffer, iframe?:boolean):ArrayBuffer {
 		let result:ArrayBuffer;
 		if(iframe || !this.previous)
-			result = this.encodeIFrame(data);
+			result = this.encode(data);
 		else
-			result = this.encodePFrame(data, this.previous);
+			result = this.encode(data, new Uint8Array(this.previous));
 		this.frames.push(new Blob([result]));
 		this.previous = data;
 		return result;
@@ -48,26 +51,22 @@ export class QOVEncoder {
 		return new Blob([header, ...frames]);
 	}
 
-	private encodeIFrame(data:ArrayBuffer):ArrayBuffer {
-		const qoi = QOI.encode({...this.config, colorspace:0, data});
-		const result = qoi.slice(QOI.QOI_HEADER_SIZE - 1, qoi.byteLength - QOI.QOI_PADDING_SIZE);
-		new Uint8Array(result)[0] = QOV_I_FRAME;
-		return result;
-	}
-
-	private encodePFrame(data:ArrayBuffer, previous:ArrayBuffer):ArrayBuffer {
-		const {channels, height, width} = this.config;
-		const index = new Uint32Array(64);
+	private encode(data:ArrayBuffer, previous?:Uint8Array):ArrayBuffer {
+		const {config:{channels, height, width}, index} = this;
 		const max_size = width * height * (channels + 1) + QOV_FRAME_HEADER_SIZE;
 		const bytes = new Uint8Array(max_size);
-		bytes[0] = QOV_P_FRAME;
+		bytes[0] = previous ? QOV_P_FRAME : QOV_I_FRAME;
 		const pixels = new Uint8Array(data);
-		const previousPixels = new Uint8Array(previous);
 		const px_len = width * height * channels;
 		const px_end = px_len - channels;
 
-		let run = 0;
 		let p = QOV_FRAME_HEADER_SIZE;
+		let run = 0;
+		let px_prev_r = 0;
+		let px_prev_g = 0;
+		let px_prev_b = 0;
+		let px_prev_a = 255;
+		let px_prev = px_prev_a;
 		for(let px_pos = 0; px_pos < px_len; px_pos += channels) {
 			const px_r = pixels[px_pos]!;
 			const px_g = pixels[px_pos + 1]!;
@@ -75,11 +74,13 @@ export class QOVEncoder {
 			const px_a = pixels[px_pos + 3]!;
 			const px = QOI.rgba2px(px_r, px_g, px_b, px_a);
 
-			const px_prev_r = previousPixels[px_pos]!;
-			const px_prev_g = previousPixels[px_pos + 1]!;
-			const px_prev_b = previousPixels[px_pos + 2]!;
-			const px_prev_a = previousPixels[px_pos + 3]!;
-			const px_prev = QOI.rgba2px(px_prev_r, px_prev_g, px_prev_b, px_prev_a);
+			if(previous) {
+				px_prev_r = previous[px_pos]!;
+				px_prev_g = previous[px_pos + 1]!;
+				px_prev_b = previous[px_pos + 2]!;
+				px_prev_a = previous[px_pos + 3]!;
+				px_prev = QOI.rgba2px(px_prev_r, px_prev_g, px_prev_b, px_prev_a);
+			}
 
 			if(px === px_prev) {
 				run++;
@@ -134,6 +135,14 @@ export class QOVEncoder {
 					}
 				}
 			}
+
+			if(!previous) {
+				px_prev_r = px_r;
+				px_prev_g = px_g;
+				px_prev_b = px_b;
+				px_prev_a = px_a;
+				px_prev = px;
+			}
 		}
 
 		return bytes.slice(0, p).buffer;
@@ -142,18 +151,29 @@ export class QOVEncoder {
 
 export class QOVDecoder {
 	readonly source:Blob;
+	readonly header:QOVHeader;
 
-	private header?:QOVHeader;
 	private state:QOVDecoderState = {nextFrame:0};
+	private readonly index = new Uint32Array(64);
 
-	constructor(source:Blob) {
+	private constructor(source:Blob, header:QOVHeader) {
 		this.source = source;
+		this.header = header;
 	}
 
-	async readHeader():Promise<QOVHeader> {
-		const {header, source} = this;
-		if(header)
-			return header;
+	static async init(source:Blob):Promise<QOVDecoder> {
+		return new this(source, await this.parseHeader(source));
+	}
+
+	get framesRead() {
+		return this.state.nextFrame;
+	}
+
+	get frameAvailable():boolean {
+		return this.state.nextFrame < this.header.frames;
+	}
+
+	static async parseHeader(source:Blob):Promise<QOVHeader> {
 		const init = await source.slice(0, 8).arrayBuffer();
 		const size = new Uint32Array(init)[4]!;
 		const view = new DataView(await source.slice(0, size).arrayBuffer());
@@ -166,16 +186,23 @@ export class QOVDecoder {
 		const framePositions = []
 		for(let i = 0; i < frames; i++)
 			framePositions.push(view.getUint32(QOV_HEADER_POSITION_FRAME_OFFSET + i * 4));
-		this.header = {size, video:{width, height, channels, frameRate}, frames, framePositions};
-		return this.header;
+		return {size, video:{width, height, channels, frameRate}, frames, framePositions};
 	}
 
-	async readFrame():Promise<ArrayBuffer> {
-		const {source, state} = this;
-		const header = await this.readHeader();
+	restart() {
+		this.state = {nextFrame:0};
+		this.index.fill(0);
+	}
+
+	async getNextFrame():Promise<ArrayBuffer> {
+		const {header, source, state} = this;
 		const start = header.framePositions[state.nextFrame]!;
-		const end = header.framePositions[state.nextFrame+1];
-		const frame = await source.slice(start, end).arrayBuffer();
+		const end = header.framePositions[state.nextFrame + 1];
+		return await source.slice(start, end).arrayBuffer();
+	}
+
+	decodeFrame(frame:ArrayBuffer):ArrayBuffer {
+		const {header, state} = this;
 		const bytes = new Uint8Array(frame);
 		const previous = this.state.previous;
 		const result =  this.decode(header, bytes,
@@ -186,11 +213,11 @@ export class QOVDecoder {
 	}
 
 	private decode(header:QOVHeader, source:ArrayBuffer, previous?:Uint8Array):ArrayBuffer {
+		const index = this.index;
 		const {channels, height, width} = header.video;
 		const px_len = width * height * channels;
 
 		const bytes = new Uint8Array(source);
-		const index = new Uint32Array(64);
 		const pixels = new Uint8Array(px_len);
 		let px_r = 0;
 		let px_g = 0;
