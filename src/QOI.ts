@@ -1,6 +1,6 @@
 const QOI_MAGIC = 0x716f6966; // [...new TextEncoder().encode("qoif")].map(item => item.toString(16)).join("")
 const QOI_HEADER_SIZE = 14;
-const QOI_COLOR_HASH = (r:number, g:number, b:number, a:number):number => r * 3 + g * 5 + b * 7 + a * 11;
+const QOI_COLOR_HASH = (r:number, g:number, b:number, a:number):number => (r * 3 + g * 5 + b * 7 + a * 11) % 64;
 const QOI_OP_INDEX = 0x00 // 00xxxxxx
 const QOI_OP_DIFF = 0x40 // 01xxxxxx
 const QOI_OP_LUMA = 0x80 // 10xxxxxx
@@ -57,7 +57,7 @@ export function encode(source:Image):ArrayBuffer {
 				run = 0;
 			}
 			
-			const index_pos = QOI_COLOR_HASH(px_r, px_g, px_b, px_a) % 64;
+			const index_pos = QOI_COLOR_HASH(px_r, px_g, px_b, px_a);
 			if(index[index_pos] === px) {
 				bytes[p++] = QOI_OP_INDEX | index_pos;
 			} else {
@@ -144,13 +144,13 @@ export function decode(source:ArrayBuffer):Image {
 				px_r = bytes[p++]!;
 				px_g = bytes[p++]!;
 				px_b = bytes[p++]!;
-				index[QOI_COLOR_HASH(px_r, px_g, px_b, px_a) % 64] = rgba2px(px_r, px_g, px_b, px_a);
+				index[QOI_COLOR_HASH(px_r, px_g, px_b, px_a)] = rgba2px(px_r, px_g, px_b, px_a);
 			} else if (b1 === QOI_OP_RGBA) {
 				px_r = bytes[p++]!;
 				px_g = bytes[p++]!;
 				px_b = bytes[p++]!;
 				px_a = bytes[p++]!;
-				index[QOI_COLOR_HASH(px_r, px_g, px_b, px_a) % 64] = rgba2px(px_r, px_g, px_b, px_a);
+				index[QOI_COLOR_HASH(px_r, px_g, px_b, px_a)] = rgba2px(px_r, px_g, px_b, px_a);
 			} else {
 				const op = b1 & QOI_MASK_2;
 				if (op === QOI_OP_INDEX) {
@@ -159,19 +159,19 @@ export function decode(source:ArrayBuffer):Image {
 					px_g = px >> 16 & 0xff;
 					px_b = px >> 8 & 0xff;
 					px_a = px & 0xff;
-					index[QOI_COLOR_HASH(px_r, px_g, px_b, px_a) % 64] = px;
+					index[QOI_COLOR_HASH(px_r, px_g, px_b, px_a)] = px;
 				} else if (op === QOI_OP_DIFF) {
 					px_r += ((b1 >> 4) & 0x03) - 2;
 					px_g += ((b1 >> 2) & 0x03) - 2;
 					px_b += (b1 & 0x03) - 2;
-					index[QOI_COLOR_HASH(px_r, px_g, px_b, px_a) % 64] = rgba2px(px_r, px_g, px_b, px_a);
+					index[QOI_COLOR_HASH(px_r, px_g, px_b, px_a)] = rgba2px(px_r, px_g, px_b, px_a);
 				} else if (op === QOI_OP_LUMA) {
 					const b2 = bytes[p++]!;
 					const vg = (b1 & 0x3f) - 32;
 					px_r += vg - 8 + ((b2 >> 4) & 0x0f);
 					px_g += vg;
 					px_b += vg - 8 +  (b2 & 0x0f);
-					index[QOI_COLOR_HASH(px_r, px_g, px_b, px_a) % 64] = rgba2px(px_r, px_g, px_b, px_a);
+					index[QOI_COLOR_HASH(px_r, px_g, px_b, px_a)] = rgba2px(px_r, px_g, px_b, px_a);
 				} else if (op === QOI_OP_RUN) {
 					run = b1 & 0x3f;
 				}
