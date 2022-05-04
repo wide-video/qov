@@ -2,9 +2,16 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "Compile",
+			"label": "Compile Production",
 			"type": "shell",
-			"command": "npx webpack",
+			"command": "npx webpack watch --mode production",
+			"problemMatcher": ["$ts-webpack", "$tslint-webpack"],
+			"group": "build"
+		},
+		{
+			"label": "Compile Development",
+			"type": "shell",
+			"command": "npx webpack watch --mode development",
 			"problemMatcher": ["$ts-webpack", "$tslint-webpack"],
 			"group": "build"
 		},

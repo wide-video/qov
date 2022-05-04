@@ -39,5 +39,7 @@ export const sha256Bytes = async (source:ArrayBuffer):Promise<string> => {
 
 export const log = (message:string, element:HTMLElement) => {
 	console.log(message);
-	element.append(message + "\n");
+	const row = document.createElement("p");
+	row.innerHTML = message;
+	element.append(row);
 }

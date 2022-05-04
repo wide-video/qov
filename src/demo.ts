@@ -26,6 +26,13 @@ import * as QOI from "./QOI";
 	Dev.log(`qoi ${qoi.byteLength/1024|0}kB`, logElement);
 	Dev.log(`result: ${Dev.compare(rgba, rgba_decoded.data)}`, logElement);
 
+	for(let i = 0; i < 10; i++) {
+		const t3 = performance.now();
+		QOI.decode(qoi);
+		const t4 = performance.now();
+		Dev.log(`performance #${i+1}: ${t4-t3|0}ms`, logElement);
+	}
+
 	canvas2.width = rgba_decoded.width;
 	canvas2.height = rgba_decoded.height;
 	const ctx2 = canvas2.getContext("2d")!;

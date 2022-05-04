@@ -1,16 +1,19 @@
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const TsconfigPathsPlugin = require('tsconfig-paths-webpack-plugin');
 
-const distPath = `${__dirname}/dist`;
-
 module.exports = () => ({
-	entry: {main:"./src/index.ts"},
-	mode: "development",
+	entry: {
+		demo:"./src/demo.ts",
+		test:"./src/test.ts"
+	},
 	module: {rules:[{test:/\.tsx?$/, loader:"ts-loader"}]},
 	optimization: {
 		minimize: false
 	},
-	output: {path:distPath, filename:"index.js"},
+	output: {
+		path: `${__dirname}/dist`,
+		filename:"[name].js"
+	},
 	performance: {maxEntrypointSize:10000000, maxAssetSize:10000000},
 	resolve: {
 		extensions:[".ts"],
@@ -18,6 +21,5 @@ module.exports = () => ({
 	},
 	plugins: [
 		new CopyWebpackPlugin({patterns:[{from:'static'}]})
-	],
-	watch: true,
+	]
 })
