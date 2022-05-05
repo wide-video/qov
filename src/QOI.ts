@@ -1,3 +1,6 @@
+// https://qoiformat.org/
+// https://github.com/phoboslab/qoi/blob/master/qoi.h
+
 const QOI_MAGIC = 0x716f6966; // [...new TextEncoder().encode("qoif")].map(item => item.toString(16)).join("")
 const QOI_HEADER_SIZE = 14;
 const QOI_PADDING = new Uint8Array(8);

@@ -1,31 +1,35 @@
 import { QOI_COLOR_HASH, QOI_RGBA, QOI_SIGNED8, QOI_UNSIGNED8 } from "./QOI";
 
 export const QOV_MAGIC = 0x716f7631; // [...new TextEncoder().encode("qov1")].map(item => item.toString(16)).join("")
-export const QOV_HEADER_POSITION_FRAME_OFFSET = 25;
-export const QOV_FRAME_HEADER_SIZE = 1;
-export const QOV_I_FRAME = 0; // intra-coded
-export const QOV_P_FRAME = 1; // predictive
+const QOV_HEADER_POSITION_FRAME_OFFSET = 25;
+const QOV_FRAME_HEADER_SIZE = 1;
+const QOV_I_FRAME = 0; // intra-coded
+const QOV_P_FRAME = 1; // predictive
 
-export const QOV_isIframe = (frame:ArrayBuffer) => new Uint8Array(frame)[0] === QOV_I_FRAME;
+export const QOV_IS_I_FRAME = (frame:ArrayBuffer) => 
+	new Uint8Array(frame)[0] === QOV_I_FRAME;
 
 export class QOVEncoder {
 	readonly config:QOVVideoConfig;
 
-	private readonly frames:Blob[] = [];
 	private previous?:ArrayBuffer;
 	private readonly index = new Uint32Array(64);
+	private readonly frames:Blob[] = [];
 
 	constructor(config:QOVVideoConfig) {
 		this.config = config;
 	}
 
 	writeFrame(data:ArrayBuffer, iframe?:boolean):ArrayBuffer {
+		const {frames, index, previous} = this;
 		let result:ArrayBuffer;
-		if(iframe || !this.previous)
+		if(iframe || !previous) {
+			index.fill(0);
 			result = this.encode(data);
-		else
-			result = this.encode(data, new Uint8Array(this.previous));
-		this.frames.push(new Blob([result]));
+		} else {
+			result = this.encode(data, new Uint8Array(previous));
+		}
+		frames.push(new Blob([result]));
 		this.previous = data;
 		return result;
 	}
@@ -51,11 +55,11 @@ export class QOVEncoder {
 		return new Blob([header, ...frames]);
 	}
 
-	private encode(data:ArrayBuffer, previous?:Uint8Array):ArrayBuffer {
+	private encode(source:ArrayBuffer, previous?:Uint8Array):ArrayBuffer {
 		const {config:{channels, height, width}, index} = this;
 		const max_size = width * height * (channels + 1) + QOV_FRAME_HEADER_SIZE;
 		const bytes = new Uint8Array(max_size);
-		const pixels = new Uint8Array(data);
+		const pixels = new Uint8Array(source);
 
 		bytes[0] = previous ? QOV_P_FRAME : QOV_I_FRAME;
 
@@ -150,8 +154,9 @@ export class QOVDecoder {
 	readonly source:Blob;
 	readonly header:QOVHeader;
 
-	private state:QOVDecoderState = {nextFrame:0};
 	private readonly index = new Uint32Array(64);
+	private nextFrame = 0;
+	private previous?:ArrayBuffer;
 
 	private constructor(source:Blob, header:QOVHeader) {
 		this.source = source;
@@ -163,11 +168,11 @@ export class QOVDecoder {
 	}
 
 	get framesRead() {
-		return this.state.nextFrame;
+		return this.nextFrame;
 	}
 
 	get frameAvailable():boolean {
-		return this.state.nextFrame < this.header.frames;
+		return this.nextFrame < this.header.frames;
 	}
 
 	static async parseHeader(source:Blob):Promise<QOVHeader> {
@@ -187,25 +192,32 @@ export class QOVDecoder {
 	}
 
 	restart() {
-		this.state = {nextFrame:0};
 		this.index.fill(0);
+		this.nextFrame = 0;
+		delete this.previous;
 	}
 
 	async getNextFrame():Promise<ArrayBuffer> {
-		const {header, source, state} = this;
-		const start = header.framePositions[state.nextFrame]!;
-		const end = header.framePositions[state.nextFrame + 1];
+		const {header:{framePositions}, nextFrame, source} = this;
+		const start = framePositions[nextFrame]!;
+		const end = framePositions[nextFrame + 1];
 		return await source.slice(start, end).arrayBuffer();
 	}
 
-	decodeFrame(frame:ArrayBuffer):ArrayBuffer {
-		const {header, state} = this;
+	readFrame(frame:ArrayBuffer):ArrayBuffer {
+		const {header, index, previous} = this;
 		const bytes = new Uint8Array(frame);
-		const previous = this.state.previous;
-		const result =  this.decode(header, bytes,
-			bytes[0] === QOV_P_FRAME && previous ? new Uint8Array(previous) : undefined);
-		state.nextFrame++;
-		state.previous = result;
+		let result:ArrayBuffer;
+		if(QOV_IS_I_FRAME(frame)) {
+			index.fill(0);
+			result = this.decode(header, bytes);
+		} else if(previous) {
+			result = this.decode(header, bytes, new Uint8Array(previous));
+		} else {
+			throw "Unexpected frame";
+		}
+		this.nextFrame++;
+		this.previous = result;
 		return result;
 	}
 
@@ -296,9 +308,4 @@ type QOVHeader = {
 	readonly video:QOVVideoConfig;
 	readonly frames:number;
 	readonly framePositions:ReadonlyArray<number>;
-}
-
-type QOVDecoderState = {
-	nextFrame:number;
-	previous?:ArrayBuffer;
 }

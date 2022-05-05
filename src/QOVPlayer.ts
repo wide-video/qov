@@ -1,4 +1,4 @@
-import { QOVDecoder, QOV_isIframe } from "./QOV";
+import { QOVDecoder, QOV_IS_I_FRAME } from "./QOV";
 
 export class QOVPlayer {
 	readonly element = document.createElement("div");
@@ -76,9 +76,9 @@ export class QOVPlayer {
 		const {video:{frameRate, height, width}} = decoder.header;
 		if(decoder.frameAvailable) {
 			const frame = await decoder.getNextFrame();
-			const iframe = QOV_isIframe(frame);
+			const iframe = QOV_IS_I_FRAME(frame);
 			const t1 = performance.now();
-			const decoded = decoder.decodeFrame(frame);
+			const decoded = decoder.readFrame(frame);
 			const t2 = performance.now();
 			const data = new ImageData(new Uint8ClampedArray(decoded), width, height);
 			context.clearRect(0, 0, width, height);

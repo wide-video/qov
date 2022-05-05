@@ -1,5 +1,5 @@
 import * as Dev from "./Dev";
-import { QOVDecoder, QOVEncoder, QOV_isIframe } from "./QOV";
+import { QOVDecoder, QOVEncoder, QOV_IS_I_FRAME } from "./QOV";
 import { QOVPlayer } from "./QOVPlayer";
 
 class Player extends QOVPlayer {
@@ -85,7 +85,7 @@ const runVideo = async () => {
 		const qovFrame = encoder.writeFrame(data, !(i % 20));
 		const t1 = performance.now();
 		duration += t1-t0;
-		const iframe = QOV_isIframe(qovFrame);
+		const iframe = QOV_IS_I_FRAME(qovFrame);
 		log(`${iframe ? "I" : "P"}-Frame #${i+1} encoded to ${qovFrame.byteLength/1024|0}kB as in ${t1-t0|0}ms`);
 	}
 	const encoded = encoder.flush();
