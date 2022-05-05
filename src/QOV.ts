@@ -1,4 +1,4 @@
-import * as QOI from "./QOI";
+import { QOI_COLOR_HASH, QOI_RGBA, QOI_SIGNED8, QOI_UNSIGNED8 } from "./QOI";
 
 export const QOV_MAGIC = 0x716f7631; // [...new TextEncoder().encode("qov1")].map(item => item.toString(16)).join("")
 export const QOV_HEADER_POSITION_FRAME_OFFSET = 25;
@@ -55,10 +55,9 @@ export class QOVEncoder {
 		const {config:{channels, height, width}, index} = this;
 		const max_size = width * height * (channels + 1) + QOV_FRAME_HEADER_SIZE;
 		const bytes = new Uint8Array(max_size);
-		bytes[0] = previous ? QOV_P_FRAME : QOV_I_FRAME;
 		const pixels = new Uint8Array(data);
-		const px_len = width * height * channels;
-		const px_end = px_len - channels;
+
+		bytes[0] = previous ? QOV_P_FRAME : QOV_I_FRAME;
 
 		let p = QOV_FRAME_HEADER_SIZE;
 		let run = 0;
@@ -67,67 +66,65 @@ export class QOVEncoder {
 		let px_prev_b = 0;
 		let px_prev_a = 255;
 		let px_prev = px_prev_a;
+		let px_a = px_prev_a;
+
+		const px_len = width * height * channels;
+		const px_end = px_len - channels;
 		for(let px_pos = 0; px_pos < px_len; px_pos += channels) {
 			const px_r = pixels[px_pos]!;
 			const px_g = pixels[px_pos + 1]!;
 			const px_b = pixels[px_pos + 2]!;
-			const px_a = pixels[px_pos + 3]!;
-			const px = QOI.QOI_RGBA(px_r, px_g, px_b, px_a);
+			if(channels === 4)
+				px_a = pixels[px_pos + 3]!;
+			
+			const px = QOI_RGBA(px_r, px_g, px_b, px_a);
 
 			if(previous) {
 				px_prev_r = previous[px_pos]!;
 				px_prev_g = previous[px_pos + 1]!;
 				px_prev_b = previous[px_pos + 2]!;
 				px_prev_a = previous[px_pos + 3]!;
-				px_prev = QOI.QOI_RGBA(px_prev_r, px_prev_g, px_prev_b, px_prev_a);
+				px_prev = QOI_RGBA(px_prev_r, px_prev_g, px_prev_b, px_prev_a);
 			}
-
+	
 			if(px === px_prev) {
 				run++;
 				if(run === 62 || px_pos === px_end) {
-					bytes[p++] = 0xc0 | (run - 1);
+					bytes[p++] = 0b11000000 | (run - 1);
 					run = 0;
 				}
 			} else {
 				if(run > 0) {
-					bytes[p++] = 0xc0 | (run - 1);
+					bytes[p++] = 0b11000000 | (run - 1);
 					run = 0;
 				}
 				
-				const index_pos = QOI.QOI_COLOR_HASH(px_r, px_g, px_b, px_a);
+				const index_pos = QOI_COLOR_HASH(px_r, px_g, px_b, px_a);
 				if(index[index_pos] === px) {
-					bytes[p++] = 0x00 | index_pos;
+					bytes[p++] = index_pos; // QOI_OP_INDEX 0x00
 				} else {
 					index[index_pos] = px;
-
+	
 					if (px_a === px_prev_a) {
-						const vr = px_r - px_prev_r;
-						const vg = px_g - px_prev_g;
-						const vb = px_b - px_prev_b;
+						const vr = QOI_SIGNED8(px_r - px_prev_r);
+						const vg = QOI_SIGNED8(px_g - px_prev_g);
+						const vb = QOI_SIGNED8(px_b - px_prev_b);
 						const vg_r = vr - vg;
 						const vg_b = vb - vg;
-
-						if(
-							vr > -3 && vr < 2 &&
-							vg > -3 && vg < 2 &&
-							vb > -3 && vb < 2
-						) {
-							bytes[p++] = 0x40 | (vr + 2) << 4 | (vg + 2) << 2 | (vb + 2);
-						} else if(
-							vg_r > -9 && vg_r <  8 &&
-							vg > -33 && vg < 32 &&
-							vg_b > -9 && vg_b < 8
-						) {
-							bytes[p++] = 0x80 | (vg + 32);
+	
+						if(vr > -3 && vr < 2 && vg > -3 && vg < 2 && vb > -3 && vb < 2) {
+							bytes[p++] = 0b01000000 | (vr + 2) << 4 | (vg + 2) << 2 | (vb + 2); // QOI_OP_DIFF
+						} else if(vg_r > -9 && vg_r <  8 && vg > -33 && vg < 32 && vg_b > -9 && vg_b < 8) {
+							bytes[p++] = 0b10000000 | (vg + 32); // QOI_OP_LUMA
 							bytes[p++] = (vg_r + 8) << 4 | (vg_b +  8);
 						} else {
-							bytes[p++] = 0xfe;
+							bytes[p++] = 0b11111110; // QOI_OP_RGB
 							bytes[p++] = px_r;
 							bytes[p++] = px_g;
 							bytes[p++] = px_b;
 						}
 					} else {
-						bytes[p++] = 0xff;
+						bytes[p++] = 0b11111111; // QOI_OP_RGBA
 						bytes[p++] = px_r;
 						bytes[p++] = px_g;
 						bytes[p++] = px_b;
@@ -213,12 +210,12 @@ export class QOVDecoder {
 	}
 
 	private decode(header:QOVHeader, source:ArrayBuffer, previous?:Uint8Array):ArrayBuffer {
-		const index = this.index;
 		const {channels, height, width} = header.video;
-		const px_len = width * height * channels;
-
 		const bytes = new Uint8Array(source);
+		const px_len = width * height * channels;
 		const pixels = new Uint8Array(px_len);
+		const index = this.index;
+
 		let px_r = 0;
 		let px_g = 0;
 		let px_b = 0;
@@ -238,50 +235,51 @@ export class QOVDecoder {
 				run--;
 			} else {
 				const b1 = bytes[p++]!;
-				if (b1 === 0xfe) {
+				if (b1 === 0b11111110) { // QOI_OP_RGB
 					px_r = bytes[p++]!;
 					px_g = bytes[p++]!;
 					px_b = bytes[p++]!;
-					index[QOI.QOI_COLOR_HASH(px_r, px_g, px_b, px_a)] = QOI.QOI_RGBA(px_r, px_g, px_b, px_a);
-				} else if (b1 === 0xff) {
+					index[QOI_COLOR_HASH(px_r, px_g, px_b, px_a)] = QOI_RGBA(px_r, px_g, px_b, px_a);
+				} else if (b1 === 0b11111111) { // QOI_OP_RGBA
 					px_r = bytes[p++]!;
 					px_g = bytes[p++]!;
 					px_b = bytes[p++]!;
 					px_a = bytes[p++]!;
-					index[QOI.QOI_COLOR_HASH(px_r, px_g, px_b, px_a)] = QOI.QOI_RGBA(px_r, px_g, px_b, px_a);
+					index[QOI_COLOR_HASH(px_r, px_g, px_b, px_a)] = QOI_RGBA(px_r, px_g, px_b, px_a);
 				} else {
-					const op = b1 & 0xc0;
-					if (op === 0x00) {
+					const op = b1 & 0b11000000;
+					if (op === 0b00000000) { // QOI_OP_INDEX
 						const px = index[b1]!;
-						px_r = px >> 24 & 0xff;
+						px_r = px >> 24;
 						px_g = px >> 16 & 0xff;
 						px_b = px >> 8 & 0xff;
 						px_a = px & 0xff;
-						index[QOI.QOI_COLOR_HASH(px_r, px_g, px_b, px_a)] = px;
-					} else if (op === 0x40) {
-						px_r += ((b1 >> 4) & 0x03) - 2;
-						px_g += ((b1 >> 2) & 0x03) - 2;
-						px_b += (b1 & 0x03) - 2;
-						index[QOI.QOI_COLOR_HASH(px_r, px_g, px_b, px_a)] = QOI.QOI_RGBA(px_r, px_g, px_b, px_a);
-					} else if (op === 0x80) {
+						index[QOI_COLOR_HASH(px_r, px_g, px_b, px_a)] = px;
+					} else if (op === 0b01000000) { // // QOI_OP_DIFF
+						px_r = QOI_UNSIGNED8(px_r + ((b1 >> 4) & 0x03) - 2);
+						px_g = QOI_UNSIGNED8(px_g + ((b1 >> 2) & 0x03) - 2);
+						px_b = QOI_UNSIGNED8(px_b + (b1 & 0x03) - 2);
+						index[QOI_COLOR_HASH(px_r, px_g, px_b, px_a)] = QOI_RGBA(px_r, px_g, px_b, px_a);
+					} else if (op === 0b10000000) { // QOI_OP_LUMA
 						const b2 = bytes[p++]!;
 						const vg = (b1 & 0x3f) - 32;
-						px_r += vg - 8 + ((b2 >> 4) & 0x0f);
-						px_g += vg;
-						px_b += vg - 8 +  (b2 & 0x0f);
-						index[QOI.QOI_COLOR_HASH(px_r, px_g, px_b, px_a)] = QOI.QOI_RGBA(px_r, px_g, px_b, px_a);
-					} else if (op === 0xc0) {
+						px_r = QOI_UNSIGNED8(px_r + vg - 8 + ((b2 >> 4) & 0x0f));
+						px_g = QOI_UNSIGNED8(px_g + vg);
+						px_b = QOI_UNSIGNED8(px_b + vg - 8 +  (b2 & 0x0f));
+						index[QOI_COLOR_HASH(px_r, px_g, px_b, px_a)] = QOI_RGBA(px_r, px_g, px_b, px_a);
+					} else if (op === 0b11000000) { // QOI_OP_RUN
 						run = b1 & 0x3f;
 					}
 				}
 			}
-
+	
 			pixels[px_pos] = px_r;
 			pixels[px_pos + 1] = px_g;
 			pixels[px_pos + 2] = px_b;
 			if (channels === 4)
 				pixels[px_pos + 3] = px_a;
 		}
+
 		return pixels.buffer;
 	}
 }
