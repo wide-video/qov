@@ -1,6 +1,7 @@
 import * as Dev from "./Dev";
 import * as QOI from "./QOI";
 
+const assetBase = "../static/qoi_test_images"
 const logElement = document.createElement("pre");
 const canvas = document.createElement("canvas");
 document.body.append(logElement);
@@ -41,9 +42,9 @@ const perf = async (label:string, count:number, executor:()=>any) => {
 
 const runQOITestImages = async () => {
 	for(const {name, channels} of testImages) {
-		await Dev.fetchToCanvas(`/qoi_test_images/${name}.png`, canvas);
-		const source = `/qoi_test_images/${name}.${channels === 4 ? "rgba" : "rgb"}`;
-		const expected = await (await fetch(`/qoi_test_images/${name}.qoi`)).arrayBuffer();
+		await Dev.fetchToCanvas(`${assetBase}/${name}.png`, canvas);
+		const source = `${assetBase}/${name}.${channels === 4 ? "rgba" : "rgb"}`;
+		const expected = await (await fetch(`${assetBase}/${name}.qoi`)).arrayBuffer();
 		const rgba = await (await fetch(source)).arrayBuffer();
 		const encoded = QOI.encode({width:canvas.width, height:canvas.height, channels, colorspace:0, data:rgba});
 
@@ -59,7 +60,7 @@ const runQOITestImages = async () => {
 }
 
 const runTestAssets = async () => {
-	const source = `/qoi_test_images/wikipedia_008.png`;
+	const source = `${assetBase}/wikipedia_008.png`;
 	await Dev.fetchToCanvas(source, canvas);
 	const rgba = Dev.readRGBA(canvas.getContext("2d")!);
 

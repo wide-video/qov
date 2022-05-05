@@ -2,6 +2,10 @@ import * as Dev from "./Dev";
 import { QOVDecoder, QOVEncoder, QOV_IS_I_FRAME } from "./QOV";
 import { QOVPlayer } from "./QOVPlayer";
 
+const assetUrl = "../static/asset/bbb_h264_1280x720_25fps_aac_51_30s_5MB.mp4";
+const frameRate = 25;
+const maxFrames = 125;
+
 class Player extends QOVPlayer {
 	private decodingDuration = 0;
 
@@ -45,9 +49,6 @@ const log = (message:string) => Dev.log(`${(performance.now()|0).toString().padS
 document.body.append(canvas, player.element, logElement);
 
 const runVideo = async () => {
-	const assetUrl = "/asset/bbb_h264_1280x720_25fps_aac_51_30s_5MB.mp4";
-	const frameRate = 25;
-	const maxFrames = 125;
 	const assetFilename = assetUrl.split("/").pop();
 	let encoder:QOVEncoder | undefined;
 	let duration = 0;

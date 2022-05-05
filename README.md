@@ -2,6 +2,8 @@
 
 POC for lossless video encoding based on [QOI](https://qoiformat.org/).
 
+Check [demo](https://wide-video.github.io/qov/static/demo.html).
+
 ## Spec
 
 - QOV format provides a custom header, followed by I-Frames and P-Frames
@@ -13,7 +15,7 @@ POC for lossless video encoding based on [QOI](https://qoiformat.org/).
 ```
 npm i                          # install dependecies
 npx webpack --mode production  # compile app
-http-server ./dist             # run http server
+http-server                    # run http server
 ```
 
 Check [demo.html](http://localhost:8080/demo.html) & [test.html](http://localhost:8080/test.html).
@@ -21,7 +23,7 @@ Check [demo.html](http://localhost:8080/demo.html) & [test.html](http://localhos
 
 ## Compare
 
-[demo.html](http://localhost:8080/demo.html) compiles `bbb_h264_1920x1080_60fps_aac_stereo_30s_11MB.mp4` into .QOV in 53 seconds, 2GB file.
+[demo.html](http://localhost:8080/demo.html) would compile `bbb_h264_1920x1080_60fps_aac_stereo_30s_11MB.mp4` into .QOV in 53 seconds, 2GB file.
 
 FFV1 produces 1.68GB output in ~60 seconds using the following configuration:
 

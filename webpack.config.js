@@ -1,4 +1,3 @@
-const CopyWebpackPlugin = require('copy-webpack-plugin');
 const TsconfigPathsPlugin = require('tsconfig-paths-webpack-plugin');
 
 module.exports = () => ({
@@ -18,8 +17,5 @@ module.exports = () => ({
 	resolve: {
 		extensions:[".ts"],
 		plugins:[new TsconfigPathsPlugin({extensions: [".ts"]})],
-	},
-	plugins: [
-		new CopyWebpackPlugin({patterns:[{from:'static'}]})
-	]
+	}
 })
