@@ -4,6 +4,7 @@ export class QOVPlayer {
 	readonly element = document.createElement("div");
 	readonly canvas = document.createElement("canvas");
 	readonly context:CanvasRenderingContext2D;
+	loop = false;
 
 	private _src:string | Blob | undefined;
 	private _decoder:QOVDecoder | undefined;
@@ -66,7 +67,7 @@ export class QOVPlayer {
 	}
 
 	protected async renderFrame():Promise<RenderFrameStats | undefined> {
-		const {canvas, context, decoder, playWhenReady} = this;
+		const {canvas, context, decoder, loop, playWhenReady} = this;
 		if(!decoder) {
 			context.clearRect(0, 0, canvas.width, canvas.height);
 			return;
@@ -91,6 +92,8 @@ export class QOVPlayer {
 			}
 			return {decodingDuration:t2 - t1, iframe};
 		}
+		if(loop)
+			this.restart();
 		return;
 	}
 }

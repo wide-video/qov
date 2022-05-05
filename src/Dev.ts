@@ -1,7 +1,3 @@
-export const assetImage = "/asset/bbb_1920x1080.png";
-export const assetVideo = "/asset/bbb_av1_640x360_25fps_aac_stereo_5s_0MB.mp4";
-export const assetVideo2 = "/asset/bbb_h264_1920x1080_60fps_aac_stereo_30s_11MB.mp4";
-
 export const fetchToCanvas = async (url:string, canvas:HTMLCanvasElement):Promise<void> => {
 	return new Promise(resolve => {
 		const image = new Image();
@@ -17,34 +13,34 @@ export const fetchToCanvas = async (url:string, canvas:HTMLCanvasElement):Promis
 	})
 }
 
-export const fetchFrames = async (url:string, canvas:HTMLCanvasElement, maxFrames:number,
-	onProgress?:(frame:number, progress:number)=>any):Promise<VideoFrames> => new Promise(resolve => {
-	const frames:Blob[] = [];
-	let width = 0;
-	let height = 0;
-	let frameRate = 0;
+export const readRGBA = (ctx:CanvasRenderingContext2D) =>
+	ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height).data.buffer
+
+export const readFrames = async (url:string, canvas:HTMLCanvasElement, maxFrames:number,
+	onFrame:(frame:ArrayBuffer, width:number, height:number, progress:number)=>any)
+	:Promise<void> => new Promise(resolve => {
 	const video = document.createElement("video");
-	video.addEventListener("ended", () => resolve({width, height, frames, frameRate}));
+	video.addEventListener("ended", () => resolve());
 	video.src = url;
 	video.muted = true;
-	const drawingLoop = () => {
-		onProgress?.(maxFrames
-			? (frames.length + 1) / maxFrames
-			: frames.length + 1, video.currentTime / video.duration);
+	let frames = 0;
+	const render = () => {
 		video.pause();
-		width = canvas.width = video.videoWidth;
-		height = canvas.height = video.videoHeight
-		frameRate = (frames.length + 1) / video.currentTime;
+		const width = canvas.width = video.videoWidth;
+		const height = canvas.height = video.videoHeight
+		const progress = maxFrames
+			? frames++ / maxFrames
+			: video.currentTime / video.duration
 		const ctx = canvas.getContext("2d")!;
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
 		ctx.drawImage(video, 0, 0);
-		frames.push(new Blob([ctx.getImageData(0, 0, width, height).data]));
-		if(frames.length === maxFrames)
-			return resolve({width, height, frames, frameRate});
-		(<any>video).requestVideoFrameCallback(drawingLoop);
+		onFrame(readRGBA(ctx), width, height, progress);
+		if(frames === maxFrames)
+			return resolve();
+		(<any>video).requestVideoFrameCallback(render);
 		video.play();
 	}
-	(<any>video).requestVideoFrameCallback(drawingLoop);
+	(<any>video).requestVideoFrameCallback(render);
 	video.play();
 })
 
@@ -86,11 +82,4 @@ export async function saveFile(file:File) {
 		await writable.write(file);
 		await writable.close();
 	} catch(error) {}
-}
-
-type VideoFrames = {
-	readonly width:number;
-	readonly height:number;
-	readonly frameRate:number;
-	readonly frames:ReadonlyArray<Blob>;
 }

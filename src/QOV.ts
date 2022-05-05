@@ -11,10 +11,10 @@ export const QOV_IS_I_FRAME = (frame:ArrayBuffer) =>
 
 export class QOVEncoder {
 	readonly config:QOVVideoConfig;
+	readonly frames:Blob[] = [];
 
 	private previous?:ArrayBuffer;
 	private readonly index = new Uint32Array(64);
-	private readonly frames:Blob[] = [];
 
 	constructor(config:QOVVideoConfig) {
 		this.config = config;

@@ -10,6 +10,19 @@ canvas {
 }
 .QOVPlayer {
 	justify-self: end;
+	position: relative;
+	background: green;
+}
+.QOVPlayer::after {
+	content: "QOV player";
+	position: absolute;
+	background: #00000066;
+	color: white;
+	left: 0;
+	top: 0;
+}
+.QOVPlayer[data-message]::after {
+	content: attr(data-message);
 }
 .log {
 	margin: 0;

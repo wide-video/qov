@@ -59,15 +59,15 @@ const runQOITestImages = async () => {
 }
 
 const runTestAssets = async () => {
-	const source = Dev.assetImage;
+	const source = `/qoi_test_images/wikipedia_008.png`;
 	await Dev.fetchToCanvas(source, canvas);
-	const rgba = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data.buffer;
+	const rgba = Dev.readRGBA(canvas.getContext("2d")!);
 
 	Dev.log("<hr>", logElement);
 
 	const encoded = QOI.encode({width:canvas.width, height:canvas.height, channels:4, colorspace:0, data:rgba});
 	assert(`QOI.encode ${source}`,
-		"5945dc4b448a6ca6c88b299693d4decbc1ed3e072d186a5d02b4c13c6a0041b9",
+		"066636f93c49f5e2938848bad645971e771c7d5c55c3e13d594ced77667ce220",
 		await Dev.sha256Bytes(encoded));
 
 	const decoded = QOI.decode(encoded);
