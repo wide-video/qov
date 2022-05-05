@@ -1,13 +1,6 @@
 export const assetImage = "/asset/bbb_1920x1080.png";
 export const assetVideo = "/asset/bbb_av1_640x360_25fps_aac_stereo_5s_0MB.mp4";
-
-/*
-const printRGBA = (source:ArrayBuffer) => {
-	const dv = new DataView(source);
-	for(let i = 0; i < source.byteLength; i += 4)
-		console.log("0x" + dv.getUint32(i).toString(16).padStart(8, "0"));
-}
-*/
+export const assetVideo2 = "/asset/bbb_h264_1920x1080_60fps_aac_stereo_30s_11MB.mp4";
 
 export const fetchToCanvas = async (url:string, canvas:HTMLCanvasElement):Promise<void> => {
 	return new Promise(resolve => {
