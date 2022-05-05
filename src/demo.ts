@@ -67,7 +67,7 @@ const runVideo = async () => {
 		return;
 
 	const {config:{width, height}, frames} = encoder;
-	log(`<b>Encoded ${frames.length} frames from video ${width}x${height}@${frameRate} in ${duration|0}ms ${frames.length/duration*1000|0} fps</b>`);
+	log(`<b>Encoded ${frames.length} frames from video ${width}x${height}@${frameRate} in ${duration|0}ms. Encoding speed is ${frames.length/duration*1000|0} fps</b>`);
 
 	const encoded = encoder.flush();
 	const qovFilename = `${assetFilename}.qov`;

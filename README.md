@@ -2,6 +2,12 @@
 
 POC for lossless video encoding based on [QOI](https://qoiformat.org/).
 
+## Spec
+
+- QOV format provides a custom header, followed by I-Frames and P-Frames
+- QOV I-Frame is similiar to QOI payload (header stripped)
+- QOV P-Frame uses customized QOI algorithm, where OPs are based on *previous frame pixel*, instead of previous pixel from the same frame.
+
 ## Build & Run
 
 ```
