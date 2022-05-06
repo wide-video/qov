@@ -16,7 +16,7 @@ export const fetchToCanvas = async (url:string, canvas:HTMLCanvasElement):Promis
 export const readRGBA = (ctx:CanvasRenderingContext2D) =>
 	ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height).data.buffer
 
-export const readFrames = async (url:string, canvas:HTMLCanvasElement, maxFrames:number,
+export const readFrames = async (blob:Blob, canvas:HTMLCanvasElement, maxFrames:number,
 	onFrame:(frame:ArrayBuffer, width:number, height:number, progress:number)=>any)
 	:Promise<void> => new Promise(resolve => {
 	const video = document.createElement("video");
@@ -30,7 +30,7 @@ export const readFrames = async (url:string, canvas:HTMLCanvasElement, maxFrames
 	}
 	video.addEventListener("ended", () => complete());
 
-	video.src = url;
+	video.src = URL.createObjectURL(blob);
 	video.muted = true;
 	let frames = 0;
 	const render = () => {

@@ -18,7 +18,7 @@ const fetchToCanvas = async (url, canvas) => {
     });
 };
 const readRGBA = (ctx) => ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height).data.buffer;
-const readFrames = async (url, canvas, maxFrames, onFrame) => new Promise(resolve => {
+const readFrames = async (blob, canvas, maxFrames, onFrame) => new Promise(resolve => {
     const video = document.createElement("video");
     const requestFrame = video.requestVideoFrameCallback?.bind(video);
     const complete = () => {
@@ -29,7 +29,7 @@ const readFrames = async (url, canvas, maxFrames, onFrame) => new Promise(resolv
         resolve();
     };
     video.addEventListener("ended", () => complete());
-    video.src = url;
+    video.src = URL.createObjectURL(blob);
     video.muted = true;
     let frames = 0;
     const render = () => {

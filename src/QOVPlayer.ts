@@ -10,6 +10,7 @@ export class QOVPlayer {
 	private _decoder:QOVDecoder | undefined;
 	private _playWhenReady = true;
 	private renderFrameId:number | undefined;
+	private lock:any;
 
 	constructor() {
 		const {canvas, element} = this;
@@ -76,7 +77,12 @@ export class QOVPlayer {
 		const t0 = performance.now();
 		const {video:{frameRate, height, width}} = decoder.header;
 		if(decoder.frameAvailable) {
+			const lock = this.lock = {};
 			const frame = await decoder.getNextFrame();
+			// click/restart() may cause race condition with await on previous line
+			if(lock !== this.lock)
+				return;
+
 			const iframe = QOV_IS_I_FRAME(frame);
 			const t1 = performance.now();
 			const decoded = decoder.readFrame(frame);

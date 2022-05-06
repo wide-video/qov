@@ -7,8 +7,24 @@ body {
 	height: 100%;
 	margin: 0;
 }
+.source {
+	position: relative;
+}
+.source:empty {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: 3px dashed #ccc;
+}
+.source:empty::after {
+	content: "Drop .mp4 or .gif here";
+}
+.source img,
 canvas {
 	width: 300;
+}
+.source img {
+	background: green;
 }
 .QOVPlayer {
 	justify-self: end;
@@ -37,5 +53,6 @@ p {
 </style>
 </head>
 <body>
+<script src="./gif.js"></script>
 <script src="../dist/demo.js"></script>
 </body>
