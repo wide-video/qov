@@ -2,7 +2,7 @@
 /******/ 	"use strict";
 var __webpack_exports__ = {};
 
-;// CONCATENATED MODULE: ./src/Dev.ts
+;// CONCATENATED MODULE: ./src/lib.ts
 const fetchToCanvas = async (url, canvas) => {
     return new Promise(resolve => {
         const image = new Image();
@@ -20,7 +20,15 @@ const fetchToCanvas = async (url, canvas) => {
 const readRGBA = (ctx) => ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height).data.buffer;
 const readFrames = async (url, canvas, maxFrames, onFrame) => new Promise(resolve => {
     const video = document.createElement("video");
-    video.addEventListener("ended", () => resolve());
+    const requestFrame = video.requestVideoFrameCallback?.bind(video);
+    const complete = () => {
+        video.removeEventListener("timeupdate", render);
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+        resolve();
+    };
+    video.addEventListener("ended", () => complete());
     video.src = url;
     video.muted = true;
     let frames = 0;
@@ -36,11 +44,13 @@ const readFrames = async (url, canvas, maxFrames, onFrame) => new Promise(resolv
         ctx.drawImage(video, 0, 0);
         onFrame(readRGBA(ctx), width, height, progress);
         if (frames === maxFrames)
-            return resolve();
-        video.requestVideoFrameCallback(render);
+            return complete();
+        requestFrame?.(render);
         video.play();
     };
-    video.requestVideoFrameCallback(render);
+    if (!requestFrame)
+        video.addEventListener("timeupdate", render);
+    requestFrame?.(render);
     video.play();
 });
 const compare = (a, b) => {

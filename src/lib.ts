@@ -20,7 +20,16 @@ export const readFrames = async (url:string, canvas:HTMLCanvasElement, maxFrames
 	onFrame:(frame:ArrayBuffer, width:number, height:number, progress:number)=>any)
 	:Promise<void> => new Promise(resolve => {
 	const video = document.createElement("video");
-	video.addEventListener("ended", () => resolve());
+	const requestFrame:Function | undefined = (<any>video).requestVideoFrameCallback?.bind(video);
+	const complete = () => {
+		video.removeEventListener("timeupdate", render);
+		video.pause();
+		video.removeAttribute("src");
+		video.load();
+		resolve();
+	}
+	video.addEventListener("ended", () => complete());
+
 	video.src = url;
 	video.muted = true;
 	let frames = 0;
@@ -36,11 +45,13 @@ export const readFrames = async (url:string, canvas:HTMLCanvasElement, maxFrames
 		ctx.drawImage(video, 0, 0);
 		onFrame(readRGBA(ctx), width, height, progress);
 		if(frames === maxFrames)
-			return resolve();
-		(<any>video).requestVideoFrameCallback(render);
+			return complete();
+		requestFrame?.(render);
 		video.play();
 	}
-	(<any>video).requestVideoFrameCallback(render);
+	if(!requestFrame)
+		video.addEventListener("timeupdate", render);
+	requestFrame?.(render);
 	video.play();
 })
 

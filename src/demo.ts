@@ -1,4 +1,4 @@
-import * as Dev from "./Dev";
+import * as lib from "./lib";
 import { QOVDecoder, QOVEncoder, QOV_IS_I_FRAME } from "./QOV";
 import { QOVPlayer } from "./QOVPlayer";
 
@@ -44,7 +44,7 @@ const player = new Player();
 const logElement = document.createElement("pre");
 logElement.classList.add("log");
 
-const log = (message:string) => Dev.log(`${(performance.now()|0).toString().padStart(4, " ")}: ${message}`, logElement);
+const log = (message:string) => lib.log(`${(performance.now()|0).toString().padStart(4, " ")}: ${message}`, logElement);
 
 document.body.append(canvas, player.element, logElement);
 
@@ -52,7 +52,7 @@ const runVideo = async () => {
 	const assetFilename = assetUrl.split("/").pop();
 	let encoder:QOVEncoder | undefined;
 	let duration = 0;
-	await Dev.readFrames(assetUrl, canvas, maxFrames, 
+	await lib.readFrames(assetUrl, canvas, maxFrames, 
 		(frame, width, height, progress) => {
 			if(!encoder)
 				encoder = new QOVEncoder({width, height, channels:4, frameRate});
@@ -74,8 +74,8 @@ const runVideo = async () => {
 	const qovFilename = `${assetFilename}.qov`;
 	const button = document.createElement("button");
 	button.textContent = `Save ${qovFilename} ${encoded.size/1024|0} KB`;
-	button.onclick = () => Dev.saveFile(new File([encoded], qovFilename));
-	Dev.log(button, logElement);
+	button.onclick = () => lib.saveFile(new File([encoded], qovFilename));
+	lib.log(button, logElement);
 
 	log(`<b>QOV encoded to ${encoded.size/1024|0}kB in ${duration|0}ms</b>`);
 	player.src = encoded;
